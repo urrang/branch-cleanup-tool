@@ -4,21 +4,29 @@ import chalk from 'chalk';
 
 type BranchInfo = { name: string; lastActive: string };
 
-const branches = await getGitBranches();
+// Close app on q being pressed
+process.stdin.setEncoding('utf-8');
+process.stdin.on('keypress', (key) => {
+    if (key === 'q') {
+        process.exit(0);
+    }
+});
 
-if (!branches.length) {
+
+const branches = await getGitBranches();
+if (!branches?.length) {
     console.log('No git branches found, exiting.');
     process.exit(0);
 }
 
-const selected = await prompt(branches);
-
-if (!selected.length) {
+const selected = await promptUser(branches);
+if (!selected?.length) {
     console.log('No branches selected.');
     process.exit(0);
 }
 
 deleteGitBranches(selected);
+
 
 function getGitBranches() {
     return new Promise<BranchInfo[]>((resolve) => {
@@ -38,26 +46,21 @@ function getGitBranches() {
                 })
                 .filter((branch) => branch.name.length);
 
-			resolve(branches);
+            resolve(branches);
         });
     });
 }
 
 async function deleteGitBranches(branches: string[]) {
     exec(`git branch -D ${branches.join(' ')}`, (_, stdout, stderr) => {
-        if (stdout) {
-            console.log(stdout);
-        }
-
-        if (stderr) {
-            console.log(stderr);
-        }
+        if (stdout) console.log(stdout);
+        if (stderr) console.log(stderr);
 
         process.exit(0);
     });
 }
 
-async function prompt(branches: BranchInfo[]) {
+async function promptUser(branches: BranchInfo[]) {
     const result = await prompts([
         {
             type: 'multiselect',
