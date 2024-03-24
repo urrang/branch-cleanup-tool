@@ -81,6 +81,8 @@ async function promptUser(branches: BranchInfo[]) {
         },
     ]);
 
-    return result.value as string[];
+	if (result.confirm) {
+		return result.value as string[];
+	}
 }
 
