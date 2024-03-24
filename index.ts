@@ -1,90 +1,83 @@
-import { $ } from "bun";
-import prompts from "prompts";
-import chalk from "chalk";
+import { exec } from 'child_process';
+import prompts from 'prompts';
+import chalk from 'chalk';
 
 type BranchInfo = { name: string; lastActive: string };
 
-// const branches = await getGitBranches();
-//
-// if (!branches.length) {
-// 	console.log('No git branches found, exiting.');
-// 	process.exit(0);
-// }
-//
-// const selected = await prompt(branches);
-//
-// if (!selected.length) {
-// 	console.log('No branches selected.')
-// 	process.exit(0);
-// }
-//
-// console.log(selected);
+const branches = await getGitBranches();
 
-deleteGitBranches(['foo', 'bar', 'baz'])
+if (!branches.length) {
+    console.log('No git branches found, exiting.');
+    process.exit(0);
+}
 
-// TODO: test in directory with no git repo
-async function getGitBranches() {
-	const res = await $`git branch --format='%(refname:short) %(committerdate:relative)' --sort=-committerdate`.text();
+const selected = await prompt(branches);
 
-	return res
-		?.split('\n')
-		.map(line => {
-			const [name, ...rest] = line.split(' ');
-			return {
-				name,
-				lastActive: rest.join(' ')
-			} as BranchInfo;
-		})
-		.filter(branch => branch.name.length)
+if (!selected.length) {
+    console.log('No branches selected.');
+    process.exit(0);
+}
+
+deleteGitBranches(selected);
+
+function getGitBranches() {
+    return new Promise<BranchInfo[]>((resolve) => {
+        const command = `git branch --format='%(refname:short) %(committerdate:relative)' --sort=-committerdate`;
+
+        exec(command, (_, stdout, stderr) => {
+            if (stderr) {
+                console.log(stderr);
+                process.exit(0);
+            }
+
+            const lines = stdout?.split('\n') || [];
+            const branches = lines
+                .map((line) => {
+                    const [name, ...rest] = line.split(' ');
+                    return { name, lastActive: rest.join(' ') } as BranchInfo;
+                })
+                .filter((branch) => branch.name.length);
+
+			resolve(branches);
+        });
+    });
 }
 
 async function deleteGitBranches(branches: string[]) {
+    exec(`git branch -D ${branches.join(' ')}`, (_, stdout, stderr) => {
+        if (stdout) {
+            console.log(stdout);
+        }
 
-	// const res = await $`git branch -D ${branches.join(' ')}`.quiet();
-	const res = await $`git branch -D foo testbranch2`.quiet();
+        if (stderr) {
+            console.log(stderr);
+        }
 
-	const stdout = res.stdout.toString();
-	const stderr = res.stderr.toString();
-
-	console.log('out', stdout);
-	console.log('err', stderr);
-	
-
-	// console.log(res);
-
-	// const results = await Promise.all(branches.map(branch => {
-	// 	return $`git branch -D ${branch}`;
-	// }));
-	//
-	// let successCount = 0;
-	// let errorCount = 0;
-	//
-	// for (const result of results) {
-	// 	result.
-	// }
+        process.exit(0);
+    });
 }
 
 async function prompt(branches: BranchInfo[]) {
     const result = await prompts([
         {
-            type: "multiselect",
-            name: "value",
-            message: "Select branches to delete",
-			choices: branches.map(branch => ({
-				title: branch.name + chalk.reset.gray(` (${branch.lastActive})`),
-				value: branch.name
-			})),
-            hint: "Use space to select and return to submit",
+            type: 'multiselect',
+            name: 'value',
+            message: 'Select branches to delete',
+            choices: branches.map((branch) => ({
+                title:
+                    branch.name + chalk.reset.gray(` (${branch.lastActive})`),
+                value: branch.name,
+            })),
+            hint: 'Use space to select and return to submit',
             instructions: false,
         },
-		{
-			type: (prev) => prev.length ? 'confirm' : null,
-			name: 'confirm',
-			message: (prev) => `Confirm deletion of ${prev.length} branches`
-		}
+        {
+            type: (prev) => (prev.length ? 'confirm' : null),
+            name: 'confirm',
+            message: (prev) => `Confirm deletion of ${prev.length} branches`,
+        },
     ]);
 
-	return result.value as string[];
+    return result.value as string[];
 }
-
 
